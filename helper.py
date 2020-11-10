@@ -1,8 +1,5 @@
-import requests
-import argparse
-import sys
-import os, re, json
-import time
+import json
+import os
 
 # if __name__ == "__main__":
 #     src = '/Users/xiaohui.zhao/workspace/CUTIE/hotel_imgs/'
@@ -26,19 +23,17 @@ if __name__ == "__main__":
     src = '/Users/xiaohui.zhao/workspace/data/CUTIE/column_identity'
     dst = '/Users/xiaohui.zhao/workspace/data/CUTIE/column'
     json_files = {}
-    for dirpath,dirnames,filenames in os.walk(src):
+    for dirpath, dirnames, filenames in os.walk(src):
         for filename in filenames:
-            file_path = os.path.join(dirpath,filename)      
+            file_path = os.path.join(dirpath, filename)
             if file_path[-3:] == 'png':
-                continue    
+                continue
             with open(file_path, encoding='utf-8') as f:
                 data = json.load(f)
                 print(len(data['fields']))
                 for i in range(len(data['fields'])):
                     data['fields'][i]['field_name'] = 'Column{}'.format(i)
-                    
-            target_path = os.path.join(dst,filename)     
+
+            target_path = os.path.join(dst, filename)
             with open(target_path, 'w') as f:
                 json.dump(data, f)
-    
-    

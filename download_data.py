@@ -1,9 +1,10 @@
-import requests
 import argparse
-from requests.auth import HTTPBasicAuth
 import base64
 import os
 import time
+
+import requests
+from requests.auth import HTTPBasicAuth
 
 
 def init_args():

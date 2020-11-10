@@ -1,55 +1,55 @@
 # written by Xiaohui Zhao
 # 2018-01 
 # xiaohui.zhao@outlook.com
-import tensorflow as tf
-import numpy as np
 import argparse
 import os
+
+import numpy as np
+import tensorflow as tf
+
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
-from model_cutie import CUTIE
-from model_cutie_res import CUTIERes
-from model_cutie_unet8 import CUTIEUNet
 from data_loader_json import DataLoader
 
 parser = argparse.ArgumentParser(description='CUTIE parameters')
 # data
-parser.add_argument('--doc_path', type=str, default='data/taxi_small') 
-parser.add_argument('--save_prefix', type=str, default='taxi', help='prefix for ckpt') # TBD: save log/models with prefix
+parser.add_argument('--doc_path', type=str, default='data/taxi_small')
+parser.add_argument('--save_prefix', type=str, default='taxi', help='prefix for ckpt')  # TBD: save log/models with prefix
 
 # dict
-parser.add_argument('--dict_path', type=str, default='dict/119547') # not used if load_dict is True
-parser.add_argument('--load_dict', type=bool, default=True, help='True to work based on an existing dict') 
-parser.add_argument('--load_dict_from_path', type=str, default='dict/119547') 
-parser.add_argument('--large_dict', type=bool, default=True, help='True to use large dict for future ext') 
+parser.add_argument('--dict_path', type=str, default='dict/119547')  # not used if load_dict is True
+parser.add_argument('--load_dict', type=bool, default=True, help='True to work based on an existing dict')
+parser.add_argument('--load_dict_from_path', type=str, default='dict/119547')
+parser.add_argument('--large_dict', type=bool, default=True, help='True to use large dict for future ext')
 
 # ckpt
-parser.add_argument('--restore_ckpt', type=bool, default=True) 
-parser.add_argument('--restore_bertembedding_only', type=bool, default=True) 
-parser.add_argument('--embedding_file', type=str, default='../graph/bert/multi_cased_L-12_H-768_A-12/bert_model.ckpt') 
-parser.add_argument('--bert_dict_file', type=str, default='dict/vocab.txt')  
+parser.add_argument('--restore_ckpt', type=bool, default=True)
+parser.add_argument('--restore_bertembedding_only', type=bool, default=True)
+parser.add_argument('--embedding_file', type=str, default='../graph/bert/multi_cased_L-12_H-768_A-12/bert_model.ckpt')
+parser.add_argument('--bert_dict_file', type=str, default='dict/vocab.txt')
 
 # training
-parser.add_argument('--embedding_size', type=int, default=768) 
+parser.add_argument('--embedding_size', type=int, default=768)
 params = parser.parse_args()
+
 
 class BertEmbedding(object):
     def __init__(self, vocab_size=119547, hidden_size=768, initializer_range=0.02, use_one_hot_embeddings=False, trainable=False):
-        self.trainable = trainable    
+        self.trainable = trainable
         self.word_embedding_name = "word_embeddings"
         self.input_ids = tf.placeholder(tf.int32, shape=[None, None, None, 1], name='grid_table')
 
         with tf.variable_scope("bert"):
-          with tf.variable_scope("embeddings"):
-            # Perform embedding lookup on the word ids.
-            (self.embedding_output, self.embedding_table) = self.embedding_lookup(
-                input_ids=self.input_ids,
-                vocab_size=vocab_size,
-                embedding_size=hidden_size,
-                initializer_range=initializer_range,
-                word_embedding_name=self.word_embedding_name,
-                use_one_hot_embeddings=use_one_hot_embeddings)
-        
+            with tf.variable_scope("embeddings"):
+                # Perform embedding lookup on the word ids.
+                (self.embedding_output, self.embedding_table) = self.embedding_lookup(
+                    input_ids=self.input_ids,
+                    vocab_size=vocab_size,
+                    embedding_size=hidden_size,
+                    initializer_range=initializer_range,
+                    word_embedding_name=self.word_embedding_name,
+                    use_one_hot_embeddings=use_one_hot_embeddings)
+
     def embedding_lookup(self, input_ids,
                          vocab_size,
                          embedding_size=128,
@@ -79,22 +79,22 @@ class BertEmbedding(object):
         # reshape to [batch_size, seq_length, 1].
         if input_ids.shape.ndims == 2:
             input_ids = tf.expand_dims(input_ids, axis=[-1])
-        
+
         embedding_table = tf.get_variable(
             name=word_embedding_name,
             shape=[vocab_size, embedding_size],
             initializer=self.create_initializer(initializer_range),
             trainable=self.trainable)
-        
+
         if use_one_hot_embeddings:
             flat_input_ids = tf.reshape(input_ids, [-1])
             one_hot_input_ids = tf.one_hot(flat_input_ids, depth=vocab_size)
             output = tf.matmul(one_hot_input_ids, embedding_table)
         else:
             output = tf.nn.embedding_lookup(embedding_table, input_ids)
-        
+
         input_shape = self.get_shape_list(input_ids)
-        
+
         output = tf.reshape(output,
                             input_shape[0:-1] + [input_shape[-1] * embedding_size])
         return (output, embedding_table)
@@ -102,7 +102,7 @@ class BertEmbedding(object):
     def create_initializer(self, initializer_range=0.02):
         """Creates a `truncated_normal_initializer` with the given range."""
         return tf.truncated_normal_initializer(stddev=initializer_range)
-    
+
     def get_shape_list(self, tensor, expected_rank=None, name=None):
         """Returns a list of the shape of tensor, preferring static dimensions.
         
@@ -119,25 +119,26 @@ class BertEmbedding(object):
           as tf.Tensor scalars.
         """
         if name is None:
-          name = tensor.name
-        
+            name = tensor.name
+
         if expected_rank is not None:
-          assert_rank(tensor, expected_rank, name)
-        
+            assert_rank(tensor, expected_rank, name)
+
         shape = tensor.shape.as_list()
-        
+
         non_static_indexes = []
         for (index, dim) in enumerate(shape):
-          if dim is None:
-            non_static_indexes.append(index)
-        
+            if dim is None:
+                non_static_indexes.append(index)
+
         if not non_static_indexes:
-          return shape
-        
+            return shape
+
         dyn_shape = tf.shape(tensor)
         for index in non_static_indexes:
-          shape[index] = dyn_shape[index]
+            shape[index] = dyn_shape[index]
         return shape
+
 
 if __name__ == '__main__':
     # data
@@ -147,21 +148,20 @@ if __name__ == '__main__':
     with open(params.bert_dict_file, encoding='utf-8') as f:
         vocabs = f.read().split('\n')
     num_words = len(vocabs)
-    dictionary = {vocab:0 for vocab in vocabs}
+    dictionary = {vocab: 0 for vocab in vocabs}
     word_to_index = dict(list(zip(dictionary.keys(), list(range(num_words)))))
     index_to_word = dict(list(zip(list(range(num_words)), dictionary.keys())))
     np.save(params.dict_path + '_dictionary.npy', dictionary)
     np.save(params.dict_path + '_word_to_index.npy', word_to_index)
     np.save(params.dict_path + '_index_to_word.npy', index_to_word)
-    
-    
+
     # model
-    bert = BertEmbedding() 
-    
+    bert = BertEmbedding()
+
     config = tf.ConfigProto(allow_soft_placement=False)
     with tf.Session(config=config) as sess:
         sess.run(tf.global_variables_initializer())
-        
+
         if params.restore_ckpt:
             if params.restore_bertembedding_only:
                 try:
@@ -173,8 +173,8 @@ if __name__ == '__main__':
                     ckpt_saver.restore(sess, ckpt_path)
                     print('Restored from {}'.format(ckpt_path))
                 except:
-                    raise('Check your path {:s}'.format(ckpt_path))
-            
+                    raise ('Check your path {:s}'.format(ckpt_path))
+
         data = data_loader.next_batch()
         # one step training
         feed_dict = {
@@ -183,4 +183,3 @@ if __name__ == '__main__':
         fetches = [bert.embedding_output, bert.embedding_table]
         (output, table) = sess.run(fetches=fetches, feed_dict=feed_dict)
         print(output[0][0][0])
-    
