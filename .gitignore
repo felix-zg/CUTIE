@@ -13,3 +13,9 @@ venv
 .idea/misc.xml
 .idea/inspectionProfiles/Project_Default.xml
 .idea/CUTIE.iml
+prod_data/
+prod_data_formated/
+log/
+dict/
+/data/results/
+/results/
